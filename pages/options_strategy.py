@@ -156,7 +156,8 @@ else:
                 ]
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            # Add unique key for each plotly chart
+            st.plotly_chart(fig, use_container_width=True, key=f'payoff_chart_{strategy["expiry"]}')
 
             # Trading instructions
             st.write("### Trading Instructions")
