@@ -82,7 +82,7 @@ def generate_trading_strategy(symbol: str = "IWM") -> dict:
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o",  # Updated to use the latest model
                 messages=[
                     {"role": "system", "content": "You are a professional trading strategy analyst."},
                     {"role": "user", "content": prompt}
@@ -104,6 +104,9 @@ def generate_trading_strategy(symbol: str = "IWM") -> dict:
                     "entry_points": ["Wait for clear signals"],
                     "exit_points": ["Maintain stop losses"]
                 }
+
+            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # do not change this unless explicitly requested by the user
 
             # Combine all insights with safe dictionary access
             return {
