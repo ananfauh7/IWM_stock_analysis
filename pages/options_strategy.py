@@ -32,7 +32,7 @@ else:
     # Display strategies for each expiration
     st.subheader("🎯 Weekly Strategy Recommendations")
 
-    for strategy in analysis['strategies']:
+    for idx, strategy in enumerate(analysis['strategies']):
         with st.expander(f"Strategy for {strategy['expiry']} ({strategy['days_to_expiry']} days) - {strategy['type']}"):
             # Strategy description
             st.markdown(f"""
@@ -45,17 +45,17 @@ else:
             # Strategy details
             st.write("### Option Strikes")
             setup_df = pd.DataFrame(strategy['setup']).T
-            st.dataframe(setup_df)
+            st.dataframe(setup_df, key=f'setup_df_{idx}')
 
             # Risk/Reward metrics
             st.write("### Risk/Reward Profile")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Max Profit", f"${strategy['risk_reward']['max_profit']}")
+                st.metric(f"Max Profit_{idx}", f"${strategy['risk_reward']['max_profit']}")
             with col2:
-                st.metric("Max Loss", f"${strategy['risk_reward']['max_loss']}")
+                st.metric(f"Max Loss_{idx}", f"${strategy['risk_reward']['max_loss']}")
             with col3:
-                st.metric("Probability of Profit", strategy['risk_reward']['probability_of_profit'])
+                st.metric(f"Probability of Profit_{idx}", strategy['risk_reward']['probability_of_profit'])
 
             # Generate payoff diagram
             st.write("### Strategy Payoff Diagram")
@@ -126,7 +126,8 @@ else:
                 height=500
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            # Add unique key for each plotly chart
+            st.plotly_chart(fig, use_container_width=True, key=f'payoff_chart_{idx}')
 
             # Trading instructions
             st.write("### Trading Instructions")
