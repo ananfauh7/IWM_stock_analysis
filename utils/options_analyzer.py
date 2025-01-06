@@ -26,14 +26,20 @@ def get_options_chain(symbol: str = "IWM") -> dict:
             try:
                 opt = stock.option_chain(date)
                 if hasattr(opt, 'calls') and hasattr(opt, 'puts'):
-                    # Filter out options with zero volume
-                    calls = opt.calls[opt.calls['volume'] > 0]
-                    puts = opt.puts[opt.puts['volume'] > 0]
+                    # Filter relevant options
+                    calls = opt.calls[
+                        (opt.calls['volume'] > 0) & 
+                        (opt.calls['lastPrice'] > 0)
+                    ]
+                    puts = opt.puts[
+                        (opt.puts['volume'] > 0) & 
+                        (opt.puts['lastPrice'] > 0)
+                    ]
 
                     if not calls.empty and not puts.empty:
                         all_options[date] = {
-                            'calls': calls,
-                            'puts': puts
+                            'calls': calls.copy(),
+                            'puts': puts.copy()
                         }
                         st.success(f"Successfully fetched options for {date}")
             except Exception as e:
@@ -51,7 +57,11 @@ def get_options_chain(symbol: str = "IWM") -> dict:
 
 def find_nearest_strike(options_df: pd.DataFrame, target_price: float) -> float:
     """Find the nearest available strike price"""
-    return options_df.loc[abs(options_df['strike'] - target_price).idxmin()]['strike']
+    try:
+        return options_df.loc[(abs(options_df['strike'] - target_price)).idxmin()]['strike']
+    except Exception as e:
+        st.error(f"Error finding nearest strike: {str(e)}")
+        return target_price
 
 def analyze_options_strategy(symbol: str = "IWM") -> dict:
     """
@@ -87,9 +97,6 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                 expiry = datetime.strptime(expiry_date, '%Y-%m-%d')
                 days_to_expiry = (expiry - datetime.now()).days
 
-                calls = chain['calls']
-                puts = chain['puts']
-
                 if volatility > 0.2:  # High volatility
                     # Find appropriate strikes for Iron Condor
                     sell_call_target = current_price * 1.02
@@ -98,10 +105,10 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                     buy_put_target = current_price * 0.96
 
                     # Find nearest available strikes
-                    sell_call_strike = find_nearest_strike(calls, sell_call_target)
-                    buy_call_strike = find_nearest_strike(calls, buy_call_target)
-                    sell_put_strike = find_nearest_strike(puts, sell_put_target)
-                    buy_put_strike = find_nearest_strike(puts, buy_put_target)
+                    sell_call_strike = find_nearest_strike(chain['calls'], sell_call_target)
+                    buy_call_strike = find_nearest_strike(chain['calls'], buy_call_target)
+                    sell_put_strike = find_nearest_strike(chain['puts'], sell_put_target)
+                    buy_put_strike = find_nearest_strike(chain['puts'], buy_put_target)
 
                     strategy = {
                         'expiry': expiry_date,
@@ -126,8 +133,8 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                     sell_call_target = current_price * 1.02
 
                     # Find nearest available strikes
-                    buy_call_strike = find_nearest_strike(calls, buy_call_target)
-                    sell_call_strike = find_nearest_strike(calls, sell_call_target)
+                    buy_call_strike = find_nearest_strike(chain['calls'], buy_call_target)
+                    sell_call_strike = find_nearest_strike(chain['calls'], sell_call_target)
 
                     strategy = {
                         'expiry': expiry_date,
