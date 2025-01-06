@@ -30,56 +30,93 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
         sentiment_score = sentiment_data.get('score', 0)
         recent_news = sentiment_data.get('recent_news', [])
 
-        # Combine technical and news sentiment for overall strategy
-        # Weight: 60% technical, 40% news sentiment
-        bullish_signals = 0
-        total_signals = 2
+        # Enhanced sentiment analysis with weighted components
+        technical_weight = 0.5  # Technical analysis weight
+        news_weight = 0.3      # News sentiment weight
+        volatility_weight = 0.2 # Volatility impact weight
 
-        if technical_sentiment == 'Bullish':
-            bullish_signals += 0.6
-        elif technical_sentiment == 'Bearish':
-            bullish_signals -= 0.6
+        # Calculate sentiment scores
+        technical_score = 1 if technical_sentiment == 'Bullish' else -1 if technical_sentiment == 'Bearish' else 0
+        news_impact = sentiment_score  # Already between -1 and 1
 
-        if sentiment_score > 0.2:  # Strong positive sentiment
-            bullish_signals += 0.4
-        elif sentiment_score < -0.2:  # Strong negative sentiment
-            bullish_signals -= 0.4
-        else:  # Neutral sentiment adds half weight
-            bullish_signals += 0.2 * (1 if sentiment_score > 0 else -1)
+        # Calculate volatility impact
+        volatility = df['Close'].pct_change().std() * np.sqrt(252)  # Annualized volatility
+        historical_vol = df['Close'].pct_change().std() * np.sqrt(252)  # Historical comparison
+        vol_impact = 1 if volatility < historical_vol else -1 if volatility > historical_vol * 1.2 else 0
 
-        # Determine overall sentiment
-        overall_sentiment = 'Bullish' if bullish_signals > 0.3 else 'Bearish' if bullish_signals < -0.3 else 'Neutral'
+        # Combined weighted score
+        total_score = (technical_score * technical_weight + 
+                      news_impact * news_weight + 
+                      vol_impact * volatility_weight)
+
+        # Determine overall sentiment with more granular categories
+        if total_score > 0.3:
+            overall_sentiment = 'Strong Bullish'
+        elif total_score > 0.1:
+            overall_sentiment = 'Moderately Bullish'
+        elif total_score < -0.3:
+            overall_sentiment = 'Strong Bearish'
+        elif total_score < -0.1:
+            overall_sentiment = 'Moderately Bearish'
+        else:
+            overall_sentiment = 'Neutral'
 
         current_price = df['Close'].iloc[-1]
-        volatility = df['Close'].pct_change().std() * np.sqrt(252)  # Annualized volatility
 
         # Generate weekly expiration dates for the next 4 weeks
         strategies = []
         for week in range(1, 5):
             expiry_date = (datetime.now() + timedelta(weeks=week)).strftime('%Y-%m-%d')
 
-            if overall_sentiment == 'Bearish':
+            # Strategy selection based on overall sentiment
+            if 'Bearish' in overall_sentiment:
                 # Bear Put Spread for bearish outlook
                 strategy_type = 'Bear Put Spread'
-                description = f'Bearish sentiment based on technical indicators ({technical_sentiment}) and news sentiment (score: {sentiment_score:.2f})'
+                # Adjust strikes based on sentiment strength
+                strike_multiplier = 1.02 if 'Strong' in overall_sentiment else 1.01
+                spread_width = 0.04 if 'Strong' in overall_sentiment else 0.03
+
                 setup = {
-                    'buy_put': {'strike': round(current_price * 1.01, 2)},
-                    'sell_put': {'strike': round(current_price * 0.97, 2)}
+                    'buy_put': {'strike': round(current_price * strike_multiplier, 2)},
+                    'sell_put': {'strike': round(current_price * (strike_multiplier - spread_width), 2)}
                 }
+
                 max_profit = round((setup['buy_put']['strike'] - setup['sell_put']['strike']) * 0.8, 2)
                 max_loss = round((setup['buy_put']['strike'] - setup['sell_put']['strike']) * 0.2, 2)
-                prob_profit = '60-70%' if sentiment_score < -0.5 else '50-60%'
+
+                # Adjust probability based on sentiment strength and news impact
+                base_prob = 60 if 'Strong' in overall_sentiment else 55
+                news_adj = 10 if sentiment_score < -0.5 else 5 if sentiment_score < -0.2 else 0
+                prob_profit = f'{base_prob + news_adj}-{base_prob + news_adj + 10}%'
+
+                description = (f"{overall_sentiment} outlook based on: \n"
+                             f"• Technical Analysis ({technical_sentiment})\n"
+                             f"• News Sentiment (Score: {sentiment_score:.2f})\n"
+                             f"• Volatility Impact ({'High' if volatility > historical_vol * 1.2 else 'Moderate' if volatility > historical_vol else 'Low'})")
             else:
                 # Bull Call Spread for bullish/neutral outlook
                 strategy_type = 'Bull Call Spread'
-                description = f'Bullish/Neutral sentiment based on technical indicators ({technical_sentiment}) and news sentiment (score: {sentiment_score:.2f})'
+                # Adjust strikes based on sentiment strength
+                strike_multiplier = 0.98 if 'Strong' in overall_sentiment else 0.99
+                spread_width = 0.04 if 'Strong' in overall_sentiment else 0.03
+
                 setup = {
-                    'buy_call': {'strike': round(current_price * 0.99, 2)},
-                    'sell_call': {'strike': round(current_price * 1.03, 2)}
+                    'buy_call': {'strike': round(current_price * strike_multiplier, 2)},
+                    'sell_call': {'strike': round(current_price * (strike_multiplier + spread_width), 2)}
                 }
+
                 max_profit = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.8, 2)
                 max_loss = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.2, 2)
-                prob_profit = '60-70%' if sentiment_score > 0.5 else '50-60%'
+
+                # Adjust probability based on sentiment strength and news impact
+                base_prob = 60 if 'Strong' in overall_sentiment else 55 if 'Moderately' in overall_sentiment else 50
+                news_adj = 10 if sentiment_score > 0.5 else 5 if sentiment_score > 0.2 else 0
+                prob_profit = f'{base_prob + news_adj}-{base_prob + news_adj + 10}%'
+
+                description = (f"{overall_sentiment} outlook based on: \n"
+                             f"• Technical Analysis ({technical_sentiment})\n"
+                             f"• News Sentiment (Score: {sentiment_score:.2f})\n"
+                             f"• Volatility Impact ({'High' if volatility > historical_vol * 1.2 else 'Moderate' if volatility > historical_vol else 'Low'})")
 
             strategies.append({
                 'type': strategy_type,
@@ -97,16 +134,23 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                     'news': {
                         'score': sentiment_score,
                         'recent_news': recent_news[:3]  # Include top 3 recent news items
-                    }
+                    },
+                    'volatility_comparison': 'High' if volatility > historical_vol * 1.2 else 'Moderate' if volatility > historical_vol else 'Low'
                 }
             })
 
         return {
             'current_price': current_price,
             'volatility': volatility,
+            'historical_volatility': historical_vol,
             'technical_sentiment': technical_sentiment,
             'news_sentiment': sentiment_score,
             'overall_sentiment': overall_sentiment,
+            'sentiment_weights': {
+                'technical': technical_weight,
+                'news': news_weight,
+                'volatility': volatility_weight
+            },
             'strategies': strategies
         }
 
