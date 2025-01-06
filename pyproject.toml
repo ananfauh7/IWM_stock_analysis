@@ -13,5 +13,6 @@ dependencies = [
     "streamlit>=1.41.1",
     "textblob>=0.18.0.post0",
     "trafilatura>=2.0.0",
+    "twilio>=9.4.1",
     "yfinance>=0.2.51",
 ]
