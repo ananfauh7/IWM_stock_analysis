@@ -1,25 +1,25 @@
-import nasdaqdatalink
+import quandl
 import pandas as pd
 import streamlit as st
 from datetime import datetime, timedelta
 import os
 
-# Initialize NASDAQ Data Link
-nasdaqdatalink.ApiConfig.api_key = os.environ.get('NASDAQ_API_KEY')
+# Initialize Quandl (NASDAQ Data Link)
+quandl.ApiConfig.api_key = os.environ.get('NASDAQ_API_KEY')
 
 @st.cache_data(ttl=3600)
 def fetch_stock_data(symbol: str) -> pd.DataFrame:
     """
-    Fetch historical stock data using NASDAQ Data Link
+    Fetch historical stock data using NASDAQ Data Link (Quandl)
     """
     try:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)
 
         # Get EOD data from NASDAQ
-        df = nasdaqdatalink.get(f'EOD/{symbol}', 
-                                start_date=start_date.strftime('%Y-%m-%d'),
-                                end_date=end_date.strftime('%Y-%m-%d'))
+        df = quandl.get(f'EOD/{symbol}', 
+                       start_date=start_date.strftime('%Y-%m-%d'),
+                       end_date=end_date.strftime('%Y-%m-%d'))
 
         if df.empty:
             raise Exception("No data found for the given symbol")
@@ -48,11 +48,11 @@ def fetch_financial_metrics(symbol: str) -> dict:
     """
     try:
         # Get latest EOD data
-        latest_data = nasdaqdatalink.get(f'EOD/{symbol}', rows=1)
+        latest_data = quandl.get(f'EOD/{symbol}', rows=1)
 
         # Get additional metrics from NASDAQ Fundamentals dataset if available
         try:
-            fundamentals = nasdaqdatalink.get(f'SHARADAR/SF1/{symbol}', rows=1)
+            fundamentals = quandl.get(f'SHARADAR/SF1/{symbol}', rows=1)
             market_cap = fundamentals.get('marketcap', 0)
             pe_ratio = fundamentals.get('pe', 0)
             eps = fundamentals.get('eps', 0)
@@ -63,7 +63,7 @@ def fetch_financial_metrics(symbol: str) -> dict:
 
         # Calculate metrics
         current_price = latest_data['Close'].iloc[-1]
-        previous_close = nasdaqdatalink.get(f'EOD/{symbol}', rows=2)['Close'].iloc[0]
+        previous_close = quandl.get(f'EOD/{symbol}', rows=2)['Close'].iloc[0]
         day_change = ((current_price - previous_close) / previous_close) * 100
 
         metrics = {
