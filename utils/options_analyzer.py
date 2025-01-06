@@ -27,29 +27,16 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
         for week in range(1, 5):
             expiry_date = (datetime.now() + timedelta(weeks=week)).strftime('%Y-%m-%d')
 
-            # Determine strategy based on market conditions
-            if volatility > 0.3:  # High volatility
-                strategy_type = 'Iron Condor'
-                description = 'High volatility environment suggests using Iron Condor for premium collection'
-                setup = {
-                    'sell_call': {'strike': round(current_price * 1.05, 2)},
-                    'buy_call': {'strike': round(current_price * 1.07, 2)},
-                    'sell_put': {'strike': round(current_price * 0.95, 2)},
-                    'buy_put': {'strike': round(current_price * 0.93, 2)}
-                }
-                max_profit = round((setup['sell_call']['strike'] - setup['sell_put']['strike']) * 0.1, 2)
-                max_loss = round((setup['buy_call']['strike'] - setup['sell_call']['strike']) * 1.0, 2)
-                prob_profit = '60-70%'
-            else:  # Low/Medium volatility
-                strategy_type = 'Bull Call Spread'
-                description = 'Moderate volatility environment favors directional strategies'
-                setup = {
-                    'buy_call': {'strike': round(current_price * 0.99, 2)},
-                    'sell_call': {'strike': round(current_price * 1.03, 2)}
-                }
-                max_profit = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.8, 2)
-                max_loss = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.2, 2)
-                prob_profit = '50-60%'
+            # Bull Call Spread strategy
+            strategy_type = 'Bull Call Spread'
+            description = 'Moderate volatility environment favors directional strategies'
+            setup = {
+                'buy_call': {'strike': round(current_price * 0.99, 2)},
+                'sell_call': {'strike': round(current_price * 1.03, 2)}
+            }
+            max_profit = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.8, 2)
+            max_loss = round((setup['sell_call']['strike'] - setup['buy_call']['strike']) * 0.2, 2)
+            prob_profit = '50-60%'
 
             strategies.append({
                 'type': strategy_type,
