@@ -7,6 +7,7 @@ import base64
 from utils.data_fetcher import fetch_stock_data, fetch_financial_metrics
 from utils.ml_predictor import predict_price_range
 from utils.sentiment_analyzer import analyze_news_sentiment
+from utils.google_finance import fetch_google_finance_data, get_related_stocks
 
 # Page configuration
 st.set_page_config(
@@ -28,15 +29,19 @@ def handle_stock_data():
         # Fetch stock data
         df_stock = fetch_stock_data(stock_symbol)
         metrics = fetch_financial_metrics(stock_symbol)
+        google_data = fetch_google_finance_data(stock_symbol)
+        related_stocks = get_related_stocks(stock_symbol)
 
         # Display company info and current price
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Current Price", f"${metrics['current_price']:.2f}")
         with col2:
             st.metric("Day Change", f"{metrics['day_change']:.2f}%")
         with col3:
-            st.metric("Volume", f"{metrics['volume']:,}")
+            st.metric("Beta", google_data['Beta'])
+        with col4:
+            st.metric("Dividend Yield", google_data['Dividend yield'])
 
         # Fetch sentiment data
         sentiment = analyze_news_sentiment(stock_symbol)
@@ -89,7 +94,16 @@ def handle_stock_data():
 
         # Financial metrics table
         st.subheader("Key Financial Metrics")
-        metrics_df = pd.DataFrame([metrics])
+
+        # Combine metrics from both sources
+        combined_metrics = {
+            **metrics,
+            'Beta': google_data['Beta'],
+            'Dividend Yield': google_data['Dividend yield'],
+            'Google Finance Market Cap': google_data['Market cap']
+        }
+
+        metrics_df = pd.DataFrame([combined_metrics])
         st.table(metrics_df.T)
 
         # Download button for CSV
@@ -122,6 +136,12 @@ def handle_stock_data():
             st.subheader("Recent News Headlines")
             for news in sentiment['recent_news']:
                 st.write(f"• {news}")
+
+        # Display related stocks
+        if related_stocks:
+            st.subheader("Related Stocks")
+            for related in related_stocks:
+                st.write(f"• {related}")
 
     except Exception as e:
         st.error(f"Error: {str(e)}")
