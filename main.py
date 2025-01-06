@@ -19,7 +19,7 @@ st.title("📈 Stock Analysis Dashboard")
 st.markdown("Enter a stock symbol to get comprehensive analysis including price predictions and sentiment analysis.")
 
 # Input for stock symbol
-stock_symbol = st.text_input("Enter Stock Symbol (e.g., AAPL, GOOGL)", "AAPL").upper()
+stock_symbol = st.text_input("Enter Stock Symbol (e.g., IWM, GOOGL)", "IWM").upper()
 
 # Error handling wrapper
 def handle_stock_data():
