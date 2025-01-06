@@ -12,7 +12,7 @@ st.set_page_config(
 
 st.title("📊 IWM Options Strategy Analysis")
 st.markdown("""
-This page provides weekly options strategies based on current market conditions.
+This page provides weekly options strategies based on current market conditions and technical sentiment.
 Each strategy is tailored to the market's volatility and price action.
 """)
 
@@ -23,11 +23,14 @@ if 'error' in analysis:
     st.error(analysis['error'])
 else:
     # Display current market conditions
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.metric("Current Price", f"${analysis['current_price']:.2f}")
     with col2:
         st.metric("Implied Volatility", f"{analysis['volatility']*100:.1f}%")
+    with col3:
+        sentiment_color = "red" if analysis['technical_sentiment'] == "Bearish" else "green"
+        st.markdown(f"**Technical Sentiment:** <span style='color:{sentiment_color}'>{analysis['technical_sentiment']}</span>", unsafe_allow_html=True)
 
     # Display strategies for each expiration
     st.subheader("🎯 Weekly Strategy Recommendations")
@@ -68,18 +71,32 @@ else:
             # Calculate payoff for each price point
             payoffs = []
             for price in price_range:
-                # Bull Call Spread payoff calculation
-                buy_strike = strategy['setup']['buy_call']['strike']
-                sell_strike = strategy['setup']['sell_call']['strike']
-                max_profit = strategy['risk_reward']['max_profit']
-                max_loss = strategy['risk_reward']['max_loss']
+                if strategy['type'] == 'Bear Put Spread':
+                    # Bear Put Spread payoff calculation
+                    buy_strike = strategy['setup']['buy_put']['strike']
+                    sell_strike = strategy['setup']['sell_put']['strike']
+                    max_profit = strategy['risk_reward']['max_profit']
+                    max_loss = strategy['risk_reward']['max_loss']
 
-                if price <= buy_strike:
-                    payoff = -max_loss
-                elif price <= sell_strike:
-                    payoff = -max_loss + (price - buy_strike)
+                    if price >= buy_strike:
+                        payoff = -max_loss
+                    elif price >= sell_strike:
+                        payoff = -max_loss + (buy_strike - price)
+                    else:
+                        payoff = max_profit
                 else:
-                    payoff = max_profit
+                    # Bull Call Spread payoff calculation
+                    buy_strike = strategy['setup']['buy_call']['strike']
+                    sell_strike = strategy['setup']['sell_call']['strike']
+                    max_profit = strategy['risk_reward']['max_profit']
+                    max_loss = strategy['risk_reward']['max_loss']
+
+                    if price <= buy_strike:
+                        payoff = -max_loss
+                    elif price <= sell_strike:
+                        payoff = -max_loss + (price - buy_strike)
+                    else:
+                        payoff = max_profit
 
                 payoffs.append(payoff)
 
@@ -120,7 +137,13 @@ else:
 
             # Trading instructions
             st.write("### Trading Instructions")
-            st.markdown(f"""
-            1. Buy 1 Call at ${strategy['setup']['buy_call']['strike']}
-            2. Sell 1 Call at ${strategy['setup']['sell_call']['strike']}
-            """)
+            if strategy['type'] == 'Bear Put Spread':
+                st.markdown(f"""
+                1. Buy 1 Put at ${strategy['setup']['buy_put']['strike']}
+                2. Sell 1 Put at ${strategy['setup']['sell_put']['strike']}
+                """)
+            else:
+                st.markdown(f"""
+                1. Buy 1 Call at ${strategy['setup']['buy_call']['strike']}
+                2. Sell 1 Call at ${strategy['setup']['sell_call']['strike']}
+                """)
