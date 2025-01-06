@@ -196,6 +196,15 @@ wheels = [
 ]
 
 [[package]]
+name = "inflection"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e1/7e/691d061b7329bc8d54edbf0ec22fbfb2afe61facb681f9aaa9bff7a27d04/inflection-0.5.1.tar.gz", hash = "sha256:1a29730d366e996aaacffb2f1f1cb9593dc38e2ddd30c91250c6dde09ea9b417", size = 15091 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/91/aa6bde563e0085a02a435aa99b49ef75b0a4b062635e606dab23ce18d720/inflection-0.5.1-py2.py3-none-any.whl", hash = "sha256:f38b2b640938a4f35ade69ac3d053042959b62a0f1076a5bbaa1b9526605a8a2", size = 9454 },
+]
+
+[[package]]
 name = "jinja2"
 version = "3.1.5"
 source = { registry = "https://pypi.org/simple" }
@@ -372,6 +381,15 @@ wheels = [
 ]
 
 [[package]]
+name = "more-itertools"
+version = "10.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/51/78/65922308c4248e0eb08ebcbe67c95d48615cc6f27854b6f2e57143e9178f/more-itertools-10.5.0.tar.gz", hash = "sha256:5482bfef7849c25dc3c6dd53a6173ae4795da2a41a80faea6700d9f5846c5da6", size = 121020 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/7e/3a64597054a70f7c86eb0a7d4fc315b8c1ab932f64883a297bdffeb5f967/more_itertools-10.5.0-py3-none-any.whl", hash = "sha256:037b0d3203ce90cca8ab1defbbdac29d5f993fc20131f3664dc8d6acfa872aef", size = 60952 },
+]
+
+[[package]]
 name = "multitasking"
 version = "0.0.11"
 source = { registry = "https://pypi.org/simple" }
@@ -387,6 +405,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f7/f0/3179615405104a90dc31a56fea27c9135f646cf4476e2904fcde125f5287/narwhals-1.20.1.tar.gz", hash = "sha256:ffc6a44c1bc651531198c5f7fc38d349dff898ecfe51c1ef96aaaf429ec4dc19", size = 224429 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3d/a2/c91fedeb24e622b30d240e89e5ecf40cb3c2a8e50f61b5b28f0eb1fbb458/narwhals-1.20.1-py3-none-any.whl", hash = "sha256:77fc10fed31534a4ecf0c5e1e091c91c454cb2fa73937f36be3fcb0c2dfdabc6", size = 262391 },
+]
+
+[[package]]
+name = "nasdaq-data-link"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "inflection" },
+    { name = "more-itertools" },
+    { name = "numpy" },
+    { name = "pandas" },
+    { name = "python-dateutil" },
+    { name = "requests" },
+    { name = "six" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/2a/f3c908206b530b93beaa90f0c645868a864bf7516fc0f0f5ed38f8f59fa1/Nasdaq_Data_Link-1.0.4-py2.py3-none-any.whl", hash = "sha256:214a620551da1c7521476839fb96f932234d4d78e7ba44310722709ca37b0691", size = 28127 },
 ]
 
 [[package]]
@@ -742,6 +777,7 @@ name = "repl-nix-stockinsighttracker"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "nasdaq-data-link" },
     { name = "pandas" },
     { name = "plotly" },
     { name = "scikit-learn" },
@@ -752,6 +788,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "nasdaq-data-link", specifier = ">=1.0.4" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "plotly", specifier = ">=5.24.1" },
     { name = "scikit-learn", specifier = ">=1.6.0" },
