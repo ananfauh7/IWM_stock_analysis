@@ -8,6 +8,7 @@ from utils.data_fetcher import fetch_stock_data, fetch_financial_metrics
 from utils.ml_predictor import predict_price_range
 from utils.sentiment_analyzer import analyze_news_sentiment
 from utils.google_finance import fetch_google_finance_data, get_related_stocks
+from utils.market_watch import fetch_market_watch_data, get_market_watch_news
 
 # Page configuration
 st.set_page_config(
@@ -30,10 +31,11 @@ def handle_stock_data():
         df_stock = fetch_stock_data(stock_symbol)
         metrics = fetch_financial_metrics(stock_symbol)
         google_data = fetch_google_finance_data(stock_symbol)
+        market_watch_data = fetch_market_watch_data(stock_symbol)
         related_stocks = get_related_stocks(stock_symbol)
 
         # Display company info and current price
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("Current Price", f"${metrics['current_price']:.2f}")
         with col2:
@@ -42,6 +44,8 @@ def handle_stock_data():
             st.metric("Beta", google_data['Beta'])
         with col4:
             st.metric("Dividend Yield", google_data['Dividend yield'])
+        with col5:
+            st.metric("Analyst Rating", market_watch_data['Analyst Rating'])
 
         # Fetch sentiment data
         sentiment = analyze_news_sentiment(stock_symbol)
@@ -95,12 +99,16 @@ def handle_stock_data():
         # Financial metrics table
         st.subheader("Key Financial Metrics")
 
-        # Combine metrics from both sources
+        # Combine metrics from all sources
         combined_metrics = {
             **metrics,
             'Beta': google_data['Beta'],
             'Dividend Yield': google_data['Dividend yield'],
-            'Google Finance Market Cap': google_data['Market cap']
+            'Google Finance Market Cap': google_data['Market cap'],
+            'MarketWatch Price Target': market_watch_data['Price Target'],
+            'MarketWatch Forward P/E': market_watch_data['Forward P/E'],
+            'MarketWatch Market Cap': market_watch_data['Market Cap'],
+            'MarketWatch 52 Week Range': market_watch_data['52 Week Range']
         }
 
         metrics_df = pd.DataFrame([combined_metrics])
@@ -121,21 +129,22 @@ def handle_stock_data():
         with col2:
             st.metric("Predicted High", f"${predicted_range['high']:.2f}")
 
-        # Sentiment Analysis Details
-        st.subheader("Market Sentiment Analysis")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Sentiment Score", f"{sentiment['score']:.2f}")
-        with col2:
-            st.metric("Positive News", sentiment['positive_count'])
-        with col3:
-            st.metric("Negative News", sentiment['negative_count'])
+        # Display news from both sources
+        st.subheader("Market News")
 
-        # Display recent news
-        if sentiment['recent_news']:
-            st.subheader("Recent News Headlines")
-            for news in sentiment['recent_news']:
-                st.write(f"• {news}")
+        # Create tabs for different news sources
+        news_tab1, news_tab2 = st.tabs(["Sentiment Analysis", "MarketWatch News"])
+
+        with news_tab1:
+            if sentiment['recent_news']:
+                for news in sentiment['recent_news']:
+                    st.write(f"• {news}")
+
+        with news_tab2:
+            market_watch_news = get_market_watch_news(stock_symbol)
+            if market_watch_news:
+                for news in market_watch_news:
+                    st.write(f"• {news}")
 
         # Display related stocks
         if related_stocks:
