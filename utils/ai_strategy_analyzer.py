@@ -8,7 +8,7 @@ from utils.sentiment_analyzer import analyze_news_sentiment
 from utils.market_watch import fetch_market_watch_data
 import openai
 import os
-import json  # Add json import for proper parsing
+import json
 
 @st.cache_data(ttl=3600)
 def generate_trading_strategy(symbol: str = "IWM") -> dict:
@@ -17,11 +17,15 @@ def generate_trading_strategy(symbol: str = "IWM") -> dict:
     """
     try:
         # Check if OpenAI API key is available
-        if not os.environ.get('OPENAI_API_KEY'):
+        api_key = os.environ.get('OPENAI_API_KEY')
+        if not api_key:
             return {
                 'error': 'OpenAI API key is not configured. Please provide the API key to enable AI-powered recommendations.',
                 'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             }
+
+        # Initialize OpenAI client with the API key
+        client = openai.OpenAI(api_key=api_key)
 
         # Collect all available data
         stock_data = fetch_stock_data(symbol)
@@ -56,7 +60,6 @@ def generate_trading_strategy(symbol: str = "IWM") -> dict:
         """
 
         # Generate AI insights using OpenAI
-        client = openai.OpenAI()
         prompt = f"""
         Based on the following market data for {symbol}, provide a detailed trading strategy recommendation:
 
