@@ -14,7 +14,6 @@ def get_options_chain(symbol: str = "IWM") -> dict:
         stock = yf.Ticker(symbol)
         all_options = {}
 
-        # Get available expiration dates
         if not hasattr(stock, 'options') or not stock.options:
             st.error(f"No options data available for {symbol}")
             return {}
@@ -26,14 +25,16 @@ def get_options_chain(symbol: str = "IWM") -> dict:
             try:
                 opt = stock.option_chain(date)
                 if hasattr(opt, 'calls') and hasattr(opt, 'puts'):
-                    # Filter relevant options
+                    # Filter relevant options with stricter criteria
                     calls = opt.calls[
-                        (opt.calls['volume'] > 0) & 
-                        (opt.calls['lastPrice'] > 0)
+                        (opt.calls['volume'] > 100) & 
+                        (opt.calls['lastPrice'] > 0) &
+                        (opt.calls['openInterest'] > 50)
                     ]
                     puts = opt.puts[
-                        (opt.puts['volume'] > 0) & 
-                        (opt.puts['lastPrice'] > 0)
+                        (opt.puts['volume'] > 100) & 
+                        (opt.puts['lastPrice'] > 0) &
+                        (opt.puts['openInterest'] > 50)
                     ]
 
                     if not calls.empty and not puts.empty:
@@ -55,13 +56,39 @@ def get_options_chain(symbol: str = "IWM") -> dict:
         st.error(f"Error in get_options_chain: {str(e)}")
         return {}
 
+def validate_strike_prices(strategy: dict, current_price: float) -> bool:
+    """Validate if the strike prices make sense for the strategy"""
+    try:
+        if strategy['type'] == 'Iron Condor':
+            return (
+                strategy['setup']['buy_put']['strike'] < strategy['setup']['sell_put']['strike'] < 
+                current_price < 
+                strategy['setup']['sell_call']['strike'] < strategy['setup']['buy_call']['strike']
+            )
+        else:  # Bull Call Spread
+            return (
+                strategy['setup']['buy_call']['strike'] < strategy['setup']['sell_call']['strike'] and
+                abs(strategy['setup']['buy_call']['strike'] - current_price) / current_price < 0.1
+            )
+    except:
+        return False
+
 def find_nearest_strike(options_df: pd.DataFrame, target_price: float) -> float:
     """Find the nearest available strike price"""
     try:
-        return options_df.loc[(abs(options_df['strike'] - target_price)).idxmin()]['strike']
+        valid_strikes = options_df[
+            (options_df['volume'] > 100) & 
+            (options_df['lastPrice'] > 0) &
+            (options_df['openInterest'] > 50)
+        ]['strike']
+
+        if valid_strikes.empty:
+            return None
+
+        return valid_strikes.iloc[(abs(valid_strikes - target_price)).argmin()]
     except Exception as e:
         st.error(f"Error finding nearest strike: {str(e)}")
-        return target_price
+        return None
 
 def analyze_options_strategy(symbol: str = "IWM") -> dict:
     """
@@ -99,16 +126,14 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
 
                 if volatility > 0.2:  # High volatility
                     # Find appropriate strikes for Iron Condor
-                    sell_call_target = current_price * 1.02
-                    buy_call_target = current_price * 1.04
-                    sell_put_target = current_price * 0.98
-                    buy_put_target = current_price * 0.96
+                    sell_call_strike = find_nearest_strike(chain['calls'], current_price * 1.02)
+                    buy_call_strike = find_nearest_strike(chain['calls'], current_price * 1.04)
+                    sell_put_strike = find_nearest_strike(chain['puts'], current_price * 0.98)
+                    buy_put_strike = find_nearest_strike(chain['puts'], current_price * 0.96)
 
-                    # Find nearest available strikes
-                    sell_call_strike = find_nearest_strike(chain['calls'], sell_call_target)
-                    buy_call_strike = find_nearest_strike(chain['calls'], buy_call_target)
-                    sell_put_strike = find_nearest_strike(chain['puts'], sell_put_target)
-                    buy_put_strike = find_nearest_strike(chain['puts'], buy_put_target)
+                    # Validate all strikes are found
+                    if not all([sell_call_strike, buy_call_strike, sell_put_strike, buy_put_strike]):
+                        continue
 
                     strategy = {
                         'expiry': expiry_date,
@@ -120,21 +145,26 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                             'buy_call': {'strike': buy_call_strike},
                             'sell_put': {'strike': sell_put_strike},
                             'buy_put': {'strike': buy_put_strike}
-                        },
-                        'risk_reward': {
-                            'max_profit': round(min(buy_call_strike - sell_call_strike, sell_put_strike - buy_put_strike) * 0.15, 2),
-                            'max_loss': round(max(buy_call_strike - sell_call_strike, sell_put_strike - buy_put_strike) * 0.85, 2),
-                            'probability_of_profit': '65-70%'
                         }
                     }
+
+                    # Calculate max profit and loss
+                    call_spread = buy_call_strike - sell_call_strike
+                    put_spread = sell_put_strike - buy_put_strike
+                    strategy['risk_reward'] = {
+                        'max_profit': round(min(call_spread, put_spread) * 0.15, 2),
+                        'max_loss': round(max(call_spread, put_spread) * 0.85, 2),
+                        'probability_of_profit': '65-70%'
+                    }
+
                 else:  # Low volatility
                     # Find appropriate strikes for Bull Call Spread
-                    buy_call_target = current_price * 0.99
-                    sell_call_target = current_price * 1.02
+                    buy_call_strike = find_nearest_strike(chain['calls'], current_price * 0.99)
+                    sell_call_strike = find_nearest_strike(chain['calls'], current_price * 1.02)
 
-                    # Find nearest available strikes
-                    buy_call_strike = find_nearest_strike(chain['calls'], buy_call_target)
-                    sell_call_strike = find_nearest_strike(chain['calls'], sell_call_target)
+                    # Validate all strikes are found
+                    if not all([buy_call_strike, sell_call_strike]):
+                        continue
 
                     strategy = {
                         'expiry': expiry_date,
@@ -144,22 +174,28 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                         'setup': {
                             'buy_call': {'strike': buy_call_strike},
                             'sell_call': {'strike': sell_call_strike}
-                        },
-                        'risk_reward': {
-                            'max_profit': round((sell_call_strike - buy_call_strike) * 0.6, 2),
-                            'max_loss': round((sell_call_strike - buy_call_strike) * 0.4, 2),
-                            'probability_of_profit': '55-60%'
                         }
                     }
 
-                strategies.append(strategy)
-                st.success(f"Successfully generated strategy for {expiry_date}")
+                    # Calculate max profit and loss
+                    spread = sell_call_strike - buy_call_strike
+                    strategy['risk_reward'] = {
+                        'max_profit': round(spread * 0.6, 2),
+                        'max_loss': round(spread * 0.4, 2),
+                        'probability_of_profit': '55-60%'
+                    }
+
+                # Validate strategy before adding
+                if validate_strike_prices(strategy, current_price):
+                    strategies.append(strategy)
+                    st.success(f"Successfully generated strategy for {expiry_date}")
+
             except Exception as e:
                 st.warning(f"Error generating strategy for {expiry_date}: {str(e)}")
                 continue
 
         if not strategies:
-            st.error("Could not generate any valid strategies")
+            st.warning("Could not generate any valid strategies with the current market conditions")
             return {
                 'error': 'No valid strategies could be generated',
                 'current_price': current_price,
@@ -172,6 +208,7 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
             'volatility': volatility,
             'strategies': sorted(strategies, key=lambda x: x['days_to_expiry'])
         }
+
     except Exception as e:
         st.error(f"Error analyzing options strategies: {str(e)}")
         return {
