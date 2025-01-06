@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 import base64
 from utils.data_fetcher import fetch_stock_data, fetch_financial_metrics
@@ -27,7 +28,7 @@ def handle_stock_data():
         # Fetch stock data
         df_stock = fetch_stock_data(stock_symbol)
         metrics = fetch_financial_metrics(stock_symbol)
-        
+
         # Display company info and current price
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -37,23 +38,53 @@ def handle_stock_data():
         with col3:
             st.metric("Volume", f"{metrics['volume']:,}")
 
-        # Stock price chart
-        st.subheader("Historical Price Chart")
-        fig = go.Figure()
-        fig.add_trace(go.Candlestick(
-            x=df_stock.index,
-            open=df_stock['Open'],
-            high=df_stock['High'],
-            low=df_stock['Low'],
-            close=df_stock['Close'],
-            name='Stock Price'
-        ))
+        # Fetch sentiment data
+        sentiment = analyze_news_sentiment(stock_symbol)
+
+        # Create subplot with secondary y-axis
+        st.subheader("Stock Price & Sentiment Analysis")
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+
+        # Add candlestick chart
+        fig.add_trace(
+            go.Candlestick(
+                x=df_stock.index,
+                open=df_stock['Open'],
+                high=df_stock['High'],
+                low=df_stock['Low'],
+                close=df_stock['Close'],
+                name='Stock Price'
+            ),
+            secondary_y=False
+        )
+
+        # Add sentiment overlay if data is available
+        if not sentiment['sentiment_data'].empty:
+            sentiment_df = sentiment['sentiment_data']
+            fig.add_trace(
+                go.Scatter(
+                    x=sentiment_df['date'],
+                    y=sentiment_df['score'],
+                    name='Sentiment Score',
+                    line=dict(color='purple', width=2),
+                    mode='lines+markers'
+                ),
+                secondary_y=True
+            )
+
+        # Update layout
         fig.update_layout(
-            title=f"{stock_symbol} Stock Price",
+            title=f"{stock_symbol} Stock Price with Sentiment Overlay",
             yaxis_title="Price (USD)",
+            yaxis2_title="Sentiment Score",
             xaxis_title="Date",
             template="plotly_white"
         )
+
+        # Set y-axes ranges
+        fig.update_yaxes(title_text="Price", secondary_y=False)
+        fig.update_yaxes(title_text="Sentiment Score", secondary_y=True, range=[-1, 1])
+
         st.plotly_chart(fig, use_container_width=True)
 
         # Financial metrics table
@@ -76,11 +107,8 @@ def handle_stock_data():
         with col2:
             st.metric("Predicted High", f"${predicted_range['high']:.2f}")
 
-        # Sentiment Analysis
+        # Sentiment Analysis Details
         st.subheader("Market Sentiment Analysis")
-        sentiment = analyze_news_sentiment(stock_symbol)
-        
-        # Display sentiment metrics
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Sentiment Score", f"{sentiment['score']:.2f}")
