@@ -35,6 +35,48 @@ else:
         sentiment_color = "red" if analysis['news_sentiment'] < -0.2 else "green" if analysis['news_sentiment'] > 0.2 else "blue"
         st.markdown(f"**News Sentiment Score:** <span style='color:{sentiment_color}'>{analysis['news_sentiment']:.2f}</span>", unsafe_allow_html=True)
 
+    # Display volatility regime and black swan comparison
+    st.subheader("📊 Volatility Analysis")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        regime_color = {
+            'High Volatility': 'red',
+            'Normal': 'blue',
+            'Low Volatility': 'green'
+        }.get(analysis['volatility_regime'], 'blue')
+
+        st.markdown(f"""
+        **Current Volatility Regime:** 
+        <span style='color:{regime_color}'>{analysis['volatility_regime']}</span>
+        """, unsafe_allow_html=True)
+
+        black_swan_pct = analysis['black_swan_comparison'].get('current_vol_vs_avg_black_swan', 0)
+        st.metric(
+            "Comparison to Historical Black Swans",
+            f"{black_swan_pct:.1f}%",
+            delta="High Risk" if black_swan_pct > 50 else "Normal",
+            delta_color="inverse" if black_swan_pct > 50 else "normal"
+        )
+
+    with col2:
+        st.markdown("### Historical Black Swan Events")
+        events_df = pd.DataFrame(analysis.get('black_swan_events', []))
+        if not events_df.empty:
+            st.dataframe(
+                events_df[['event', 'date', 'price_impact', 'recovery_days']],
+                hide_index=True,
+                column_config={
+                    'price_impact': st.column_config.NumberColumn(
+                        'Impact (%)',
+                        format="%.1f%%"
+                    ),
+                    'recovery_days': st.column_config.NumberColumn(
+                        'Recovery (Days)'
+                    )
+                }
+            )
+
     # Overall Sentiment
     st.subheader("Overall Market Sentiment")
     overall_color = "red" if analysis['overall_sentiment'] == "Bearish" else "green" if analysis['overall_sentiment'] == "Bullish" else "blue"
