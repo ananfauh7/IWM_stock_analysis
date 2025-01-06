@@ -26,11 +26,16 @@ def get_options_chain(symbol: str = "IWM") -> dict:
             try:
                 opt = stock.option_chain(date)
                 if hasattr(opt, 'calls') and hasattr(opt, 'puts'):
-                    all_options[date] = {
-                        'calls': opt.calls,
-                        'puts': opt.puts
-                    }
-                    st.success(f"Successfully fetched options for {date}")
+                    # Filter out options with zero volume
+                    calls = opt.calls[opt.calls['volume'] > 0]
+                    puts = opt.puts[opt.puts['volume'] > 0]
+
+                    if not calls.empty and not puts.empty:
+                        all_options[date] = {
+                            'calls': calls,
+                            'puts': puts
+                        }
+                        st.success(f"Successfully fetched options for {date}")
             except Exception as e:
                 st.warning(f"Error fetching options for date {date}: {str(e)}")
                 continue
@@ -43,6 +48,10 @@ def get_options_chain(symbol: str = "IWM") -> dict:
     except Exception as e:
         st.error(f"Error in get_options_chain: {str(e)}")
         return {}
+
+def find_nearest_strike(options_df: pd.DataFrame, target_price: float) -> float:
+    """Find the nearest available strike price"""
+    return options_df.loc[abs(options_df['strike'] - target_price).idxmin()]['strike']
 
 def analyze_options_strategy(symbol: str = "IWM") -> dict:
     """
@@ -78,46 +87,60 @@ def analyze_options_strategy(symbol: str = "IWM") -> dict:
                 expiry = datetime.strptime(expiry_date, '%Y-%m-%d')
                 days_to_expiry = (expiry - datetime.now()).days
 
-                # Filter relevant options
                 calls = chain['calls']
                 puts = chain['puts']
 
-                # Find ATM options
-                atm_call = calls[abs(calls['strike'] - current_price).idxmin()]
-                atm_put = puts[abs(puts['strike'] - current_price).idxmin()]
-
-                # Strategy selection based on market conditions
                 if volatility > 0.2:  # High volatility
+                    # Find appropriate strikes for Iron Condor
+                    sell_call_target = current_price * 1.02
+                    buy_call_target = current_price * 1.04
+                    sell_put_target = current_price * 0.98
+                    buy_put_target = current_price * 0.96
+
+                    # Find nearest available strikes
+                    sell_call_strike = find_nearest_strike(calls, sell_call_target)
+                    buy_call_strike = find_nearest_strike(calls, buy_call_target)
+                    sell_put_strike = find_nearest_strike(puts, sell_put_target)
+                    buy_put_strike = find_nearest_strike(puts, buy_put_target)
+
                     strategy = {
                         'expiry': expiry_date,
                         'days_to_expiry': days_to_expiry,
                         'type': 'Iron Condor',
                         'description': 'High volatility strategy to collect premium',
                         'setup': {
-                            'sell_call': {'strike': round(current_price * 1.02, 2)},
-                            'buy_call': {'strike': round(current_price * 1.04, 2)},
-                            'sell_put': {'strike': round(current_price * 0.98, 2)},
-                            'buy_put': {'strike': round(current_price * 0.96, 2)}
+                            'sell_call': {'strike': sell_call_strike},
+                            'buy_call': {'strike': buy_call_strike},
+                            'sell_put': {'strike': sell_put_strike},
+                            'buy_put': {'strike': buy_put_strike}
                         },
                         'risk_reward': {
-                            'max_profit': round(atm_call['impliedVolatility'] * current_price * 0.1, 2),
-                            'max_loss': round(current_price * 0.02, 2),
+                            'max_profit': round(min(buy_call_strike - sell_call_strike, sell_put_strike - buy_put_strike) * 0.15, 2),
+                            'max_loss': round(max(buy_call_strike - sell_call_strike, sell_put_strike - buy_put_strike) * 0.85, 2),
                             'probability_of_profit': '65-70%'
                         }
                     }
                 else:  # Low volatility
+                    # Find appropriate strikes for Bull Call Spread
+                    buy_call_target = current_price * 0.99
+                    sell_call_target = current_price * 1.02
+
+                    # Find nearest available strikes
+                    buy_call_strike = find_nearest_strike(calls, buy_call_target)
+                    sell_call_strike = find_nearest_strike(calls, sell_call_target)
+
                     strategy = {
                         'expiry': expiry_date,
                         'days_to_expiry': days_to_expiry,
                         'type': 'Bull Call Spread',
                         'description': 'Bullish strategy for low volatility environment',
                         'setup': {
-                            'buy_call': {'strike': round(current_price * 0.99, 2)},
-                            'sell_call': {'strike': round(current_price * 1.02, 2)}
+                            'buy_call': {'strike': buy_call_strike},
+                            'sell_call': {'strike': sell_call_strike}
                         },
                         'risk_reward': {
-                            'max_profit': round(current_price * 0.03, 2),
-                            'max_loss': round(atm_call['lastPrice'], 2),
+                            'max_profit': round((sell_call_strike - buy_call_strike) * 0.6, 2),
+                            'max_loss': round((sell_call_strike - buy_call_strike) * 0.4, 2),
                             'probability_of_profit': '55-60%'
                         }
                     }
