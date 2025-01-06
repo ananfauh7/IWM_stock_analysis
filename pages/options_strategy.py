@@ -14,6 +14,13 @@ st.title("📊 IWM Options Strategy Analysis")
 st.markdown("""
 This page provides weekly options strategies based on current market conditions.
 Each strategy is tailored to the market's volatility and price action.
+
+### Iron Condor Strategy
+An Iron Condor is a neutral options strategy that profits when the stock trades in a range:
+- Sells a call spread (bear call spread)
+- Sells a put spread (bull put spread)
+- Maximum profit achieved when stock price stays between short strikes
+- Limited risk due to protective long options
 """)
 
 # Get options analysis
@@ -40,6 +47,14 @@ else:
             **Type:** {strategy['type']}  
             **Description:** {strategy['description']}  
             **Days to Expiry:** {strategy['days_to_expiry']}
+
+            {'#### Iron Condor Details' if strategy['type'] == 'Iron Condor' else ''}
+            {'''
+            - Profit Zone: Between short call and short put strikes
+            - Maximum Profit: Achieved when stock expires between short strikes
+            - Risk Management: Protected by long options on both sides
+            - Best For: High volatility environments expecting range-bound price action
+            ''' if strategy['type'] == 'Iron Condor' else ''}
             """)
 
             # Strategy details
@@ -117,13 +132,37 @@ else:
             fig.add_hline(y=0, line_dash="dash", line_color="gray")
             fig.add_vline(x=analysis['current_price'], line_dash="dash", line_color="red")
 
+            # For Iron Condor, add vertical lines at option strikes
+            if strategy['type'] == 'Iron Condor':
+                fig.add_vline(x=strategy['setup']['sell_put']['strike'], 
+                            line_dash="dot", line_color="green",
+                            annotation_text="Short Put")
+                fig.add_vline(x=strategy['setup']['sell_call']['strike'], 
+                            line_dash="dot", line_color="green",
+                            annotation_text="Short Call")
+                fig.add_vline(x=strategy['setup']['buy_put']['strike'], 
+                            line_dash="dot", line_color="orange",
+                            annotation_text="Long Put")
+                fig.add_vline(x=strategy['setup']['buy_call']['strike'], 
+                            line_dash="dot", line_color="orange",
+                            annotation_text="Long Call")
+
             fig.update_layout(
                 title="Profit/Loss at Expiration",
                 xaxis_title="Stock Price",
                 yaxis_title="Profit/Loss ($)",
                 showlegend=True,
                 template="plotly_white",
-                height=500
+                height=500,
+                annotations=[
+                    dict(
+                        x=analysis['current_price'],
+                        y=max(payoffs),
+                        text="Current Price",
+                        showarrow=True,
+                        arrowhead=1
+                    )
+                ]
             )
 
             # Add unique key for each plotly chart
@@ -133,10 +172,16 @@ else:
             st.write("### Trading Instructions")
             if strategy['type'] == 'Iron Condor':
                 st.markdown(f"""
-                1. Sell 1 Call at ${strategy['setup']['sell_call']['strike']}
-                2. Buy 1 Call at ${strategy['setup']['buy_call']['strike']}
-                3. Sell 1 Put at ${strategy['setup']['sell_put']['strike']}
-                4. Buy 1 Put at ${strategy['setup']['buy_put']['strike']}
+                **Iron Condor Setup:**
+                1. Sell 1 Call at ${strategy['setup']['sell_call']['strike']} (Short Call)
+                2. Buy 1 Call at ${strategy['setup']['buy_call']['strike']} (Long Call - Protection)
+                3. Sell 1 Put at ${strategy['setup']['sell_put']['strike']} (Short Put)
+                4. Buy 1 Put at ${strategy['setup']['buy_put']['strike']} (Long Put - Protection)
+
+                **Risk Management:**
+                - Maximum Loss: ${strategy['risk_reward']['max_loss']}
+                - Consider closing the position if the stock price moves close to either short strike
+                - Target 50% of maximum profit for early exit
                 """)
             else:
                 st.markdown(f"""
