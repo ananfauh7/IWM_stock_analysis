@@ -12,8 +12,8 @@ st.set_page_config(
 
 st.title("📊 IWM Options Strategy Analysis")
 st.markdown("""
-This page provides weekly options strategies based on current market conditions and technical sentiment.
-Each strategy is tailored to the market's volatility and price action.
+This page provides weekly options strategies based on current market conditions, technical analysis, and news sentiment.
+Each strategy is tailored to the market's volatility, price action, and market sentiment.
 """)
 
 # Get options analysis
@@ -23,7 +23,7 @@ if 'error' in analysis:
     st.error(analysis['error'])
 else:
     # Display current market conditions
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Current Price", f"${analysis['current_price']:.2f}")
     with col2:
@@ -31,12 +31,20 @@ else:
     with col3:
         sentiment_color = "red" if analysis['technical_sentiment'] == "Bearish" else "green"
         st.markdown(f"**Technical Sentiment:** <span style='color:{sentiment_color}'>{analysis['technical_sentiment']}</span>", unsafe_allow_html=True)
+    with col4:
+        sentiment_color = "red" if analysis['news_sentiment'] < -0.2 else "green" if analysis['news_sentiment'] > 0.2 else "blue"
+        st.markdown(f"**News Sentiment Score:** <span style='color:{sentiment_color}'>{analysis['news_sentiment']:.2f}</span>", unsafe_allow_html=True)
+
+    # Overall Sentiment
+    st.subheader("Overall Market Sentiment")
+    overall_color = "red" if analysis['overall_sentiment'] == "Bearish" else "green" if analysis['overall_sentiment'] == "Bullish" else "blue"
+    st.markdown(f"<h3 style='color:{overall_color}'>{analysis['overall_sentiment']}</h3>", unsafe_allow_html=True)
 
     # Display strategies for each expiration
     st.subheader("🎯 Weekly Strategy Recommendations")
 
     for idx, strategy in enumerate(analysis['strategies']):
-        with st.expander(f"Strategy for {strategy['expiry']} ({strategy['days_to_expiry']} days) - {strategy['type']}"):
+        with st.expander(f"Strategy for {strategy['expiry']} ({strategy['days_to_expiry']} days) - {strategy['type']}", expanded=idx==0):
             # Strategy description
             st.markdown(f"""
             ### Strategy Overview
@@ -45,20 +53,36 @@ else:
             **Days to Expiry:** {strategy['days_to_expiry']}
             """)
 
+            # Sentiment Analysis
+            st.write("### Sentiment Analysis")
+            col1, col2 = st.columns(2)
+            with col1:
+                tech_color = "green" if strategy['sentiment_data']['technical'] == "Bullish" else "red" if strategy['sentiment_data']['technical'] == "Bearish" else "blue"
+                st.markdown(f"**Technical Sentiment:** <span style='color:{tech_color}'>{strategy['sentiment_data']['technical']}</span>", unsafe_allow_html=True)
+            with col2:
+                news_score = strategy['sentiment_data']['news']['score']
+                news_color = "green" if news_score > 0.2 else "red" if news_score < -0.2 else "blue"
+                st.markdown(f"**News Sentiment Score:** <span style='color:{news_color}'>{news_score:.2f}</span>", unsafe_allow_html=True)
+
+            # Recent News
+            st.write("### Recent News Impact")
+            for news in strategy['sentiment_data']['news']['recent_news']:
+                st.markdown(f"• {news}")
+
             # Strategy details
             st.write("### Option Strikes")
             setup_df = pd.DataFrame(strategy['setup']).T
-            st.dataframe(setup_df, key=f'setup_df_{idx}')
+            st.dataframe(setup_df)
 
             # Risk/Reward metrics
             st.write("### Risk/Reward Profile")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric(f"Max Profit_{idx}", f"${strategy['risk_reward']['max_profit']}")
+                st.metric("Max Profit", f"${strategy['risk_reward']['max_profit']}")
             with col2:
-                st.metric(f"Max Loss_{idx}", f"${strategy['risk_reward']['max_loss']}")
+                st.metric("Max Loss", f"${strategy['risk_reward']['max_loss']}")
             with col3:
-                st.metric(f"Probability of Profit_{idx}", strategy['risk_reward']['probability_of_profit'])
+                st.metric("Probability of Profit", strategy['risk_reward']['probability_of_profit'])
 
             # Generate payoff diagram
             st.write("### Strategy Payoff Diagram")
@@ -132,8 +156,7 @@ else:
                 ]
             )
 
-            # Add unique key for each plotly chart
-            st.plotly_chart(fig, use_container_width=True, key=f'payoff_chart_{idx}')
+            st.plotly_chart(fig, use_container_width=True)
 
             # Trading instructions
             st.write("### Trading Instructions")
